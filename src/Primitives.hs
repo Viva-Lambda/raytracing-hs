@@ -1,0 +1,381 @@
+-- Primitives for the general
+module Primitives where
+{-
+// start constants
+// constants.hpp
+float PI = 3.1415926535;
+float INFINITY = 1.0 / 0.0;
+// end constants
+//
+// --------------------- utility functions ------------------------------
+float degree_to_radian(float degree) {
+  //
+  return degree * PI / 180.0;
+}
+float rand(vec2 co) {
+  // random gen
+  float a = 12.9898;
+  float b = 78.233;
+  float c = 43758.5453;
+  float dt = dot(co.xy, vec2(a, b));
+  float sn = mod(dt, PI);
+  return fract(sin(sn) * c);
+}
+float random_double() {
+  // random double
+  return rand(vec2(0.0, 1.0));
+}
+float random_double(float mi, float mx) {
+  // random double
+  return rand(vec2(mi, mx));
+}
+int random_int(int mi, int mx) { return int(random_double(mi, mx)); }
+vec3 random_vec() {
+  // random vector
+  return vec3(random_double(), random_double(), random_double());
+}
+vec3 random_vec(float mi, float ma) {
+  // random vector in given seed
+  return vec3(random_double(mi, ma), random_double(mi, ma),
+              random_double(mi, ma));
+}
+vec3 random_in_unit_sphere() {
+  // random in unit sphere
+  while (true) {
+    //
+    vec3 v = random_vec(-1.0, 1.0);
+    if (dot(v, v) >= 1.0) {
+      continue;
+    }
+    return v;
+  }
+}
+vec3 random_unit_vector() {
+  // unit vector
+  float a = random_double(0, 2 * PI);
+  float z = random_double(-1, 1);
+  float r = sqrt(1 - z * z);
+  return vec3(r * cos(a), r * sin(a), z);
+}
+vec3 random_in_hemisphere(vec3 normal) {
+  // normal ekseninde dagilan yon
+  vec3 unit_sphere_dir = random_in_unit_sphere();
+  if (dot(unit_sphere_dir, normal) > 0.0) {
+    return unit_sphere_dir;
+  } else {
+    return -1 * unit_sphere_dir;
+  }
+}
+vec3 random_in_unit_disk() {
+  // lens yakinsamasi için gerekli
+  while (true) {
+    vec3 point = vec3(random_double(-1, 1), random_double(-1, 1), 0);
+    if (dot(point, point) >= 1) {
+      continue;
+    }
+    return point;
+  }
+}
+vec3 refract_vec(vec3 uv, vec3 normal, float eta_over) {
+  //
+  float cos_theta = dot(-uv, normal);
+  vec3 outpar = eta_over * (uv + (cos_theta * normal));
+  vec3 out_prep = -sqrt(1.0 - dot(outpar, outpar)) * normal;
+  return outpar + out_prep;
+}
+
+vec3 mixv(float mi, float ma, vec3 val) {
+  //
+  return vec3(mix(mi, ma, val.x), mix(mi, ma, val.y), mix(mi, ma, val.z));
+}
+
+vec3 fix_color(vec3 pcolor, int samples_per_pixel) {
+  // scale sample
+  pcolor /= samples_per_pixel;
+  return clamp(sqrt(pcolor), 0.0, 0.999);
+  // return mixv(0.0, 0.999, sqrt(pcolor));
+}
+
+// --------------------- utility functions end --------------------------
+
+//
+struct Ray {
+  vec3 origin;
+  vec3 direction;
+};
+Ray makeRay(vec3 orig, vec3 dir) {
+  Ray r;
+  r.origin = orig;
+  r.direction = dir;
+  return r;
+}
+
+vec3 at(Ray r, float dist) { return r.direction * dist + r.origin; }
+
+struct HitRecord {
+  vec3 point;
+  vec3 normal;
+  float dist;
+  bool front_face;
+};
+
+HitRecord makeRecord(vec3 p, vec3 n, float d, bool ff) {
+  HitRecord rec;
+  rec.point = p;
+  rec.normal = n;
+  rec.dist = d;
+  rec.front_face = ff;
+  return rec;
+}
+
+void set_face_normal(inout HitRecord rec, in Ray r, in vec3 out_normal) {
+  // set face normal to hit record did we hit front or back
+  rec.front_face = dot(r.direction, out_normal) < 0;
+  rec.normal = (rec.front_face) ? out_normal : -1 * out_normal;
+}
+struct Camera {
+  vec3 lower_left_corner;
+  vec3 origin;
+  vec3 vertical;
+  vec3 horizontal;
+};
+
+Camera makeCamera(float aspect_ratio, float focus_dist) {
+  // make camera struct
+  Camera cam;
+  cam.origin = vec3(0.0, 0.0, 0.0);
+  cam.horizontal = vec3(4, 0, 0);
+  cam.vertical = vec3(0, 2, 0);
+  cam.lower_left_corner = vec3(-2, -1, -1);
+
+  return cam;
+}
+
+Ray get_ray(Camera ca, float u, float v) {
+  // get camera ray
+  vec3 r_origin = ca.origin;
+  vec3 r_dir =
+      ca.lower_left_corner + (u * ca.horizontal) + (v * ca.vertical) - r_origin;
+  return makeRay(r_origin, r_dir);
+}
+
+struct Sphere {
+  vec3 center;
+  float radius;
+};
+
+Sphere makeSphere(vec3 cent, float r) {
+  Sphere sp;
+  sp.center = cent;
+  sp.radius = r;
+  return sp;
+}
+
+bool hitSphere(in Sphere s, in Ray r, float dist_min, float dist_max,
+               inout HitRecord record) {
+  // kureye isin vurdu mu onu test eden fonksiyon
+  vec3 origin_to_center = r.origin - s.center;
+  float a = dot(r.direction, r.direction);
+  float half_b = dot(origin_to_center, r.direction);
+  float c = dot(origin_to_center, origin_to_center) - s.radius * s.radius;
+  float isHit = half_b * half_b - a * c;
+  float margin;
+  if (isHit > 0) {
+    float root = sqrt(isHit);
+    margin = (-1 * half_b - root) / a;
+    if (margin < dist_max && margin > dist_min) {
+      record.dist = margin;
+      record.point = at(r, record.dist);
+      vec3 out_normal = (record.point - s.center) / s.radius;
+      set_face_normal(record, r, out_normal);
+      return true;
+    }
+    margin = (-1 * half_b + root) / a;
+    if (margin < dist_max && margin > dist_min) {
+      record.dist = margin;
+      record.point = at(r, record.dist);
+      vec3 out_normal = (record.point - s.center) / s.radius;
+      set_face_normal(record, r, out_normal);
+      return true;
+    }
+  }
+  return false;
+}
+
+struct SceneObj {
+  int type; // 0 sphere, 1, other
+  Sphere sp;
+};
+
+struct Scene {
+  SceneObj ss[SCENE_OBJECT_NB];
+  bool isEmpty;
+};
+
+Scene sliceScene(in Scene scn, int s, int e) {
+  // slice scene
+  Scene sout;
+  if ((s < 0) || (e > SCENE_OBJECT_NB)) {
+    sout.isEmpty = true;
+    return sout;
+  }
+  int k = 0;
+  for (int i = s; i < e; i++) {
+    sout.ss[k] = scn.ss[i];
+    k += 1;
+  }
+  sout.isEmpty = false;
+  return sout;
+}
+
+bool hit_scene(in Scene scene, in Ray r, float dmin, float dmax,
+               inout HitRecord record) {
+  // check if sphere is hit
+  HitRecord temp;
+  bool hit_ = false;
+  float current_closest = dmax;
+  for (int i = 0; i < SCENE_OBJECT_NB; i++) {
+    SceneObj sobj = scene.ss[i];
+    if (sobj.type == 0) {
+      if (hitSphere(sobj.sp, r, dmin, current_closest, temp)) {
+        hit_ = true;
+        current_closest = temp.dist;
+        record = temp;
+      }
+    }
+  }
+  return hit_;
+}
+/*
+ *color ray_color(const ray& r, const hittable& world, int depth) {
+    hit_record rec;
+
+    // If we've exceeded the ray bounce limit, no more light is gathered.
+    if (depth <= 0)
+        return color(0,0,0);
+
+    if (world.hit(r, 0.001, infinity, rec)) {
+        point3 target = rec.p + rec.normal + random_unit_vector();
+        return 0.5 * ray_color(ray(rec.p, target - rec.p), world, depth-1);
+    }
+
+    vec3 unit_direction = unit_vector(r.direction());
+    auto t = 0.5*(unit_direction.y() + 1.0);
+    return (1.0-t)*color(1.0, 1.0, 1.0) + t*color(0.5, 0.7, 1.0);
+}
+ *
+ * */
+
+vec3 no_hit_color(in Ray r) {
+  vec3 dir = normalize(r.direction);
+  float temp = 0.5 * (dir.y + 1.0);
+  vec3 cval = vec3(1.0 - temp) + temp * vec3(0.5, 0.7, 1.0);
+  return cval;
+}
+
+vec3 ray_color(in Ray r, in Scene scene, int depth) {
+  //
+  Ray r_in;
+  r_in.origin = r.origin;
+  r_in.direction = r.direction;
+  vec3 bcolor = vec3(1);
+
+  while (true) {
+    if (depth <= 0) {
+      //
+      return vec3(0);
+      // return bcolor;
+    }
+    HitRecord rec;
+    if (hit_scene(scene, r_in, 0.001, INFINITY, rec)) {
+      vec3 target = rec.point + random_in_hemisphere(rec.normal);
+      r_in = makeRay(rec.point, target - rec.point);
+      depth--;
+      bcolor *= 0.5;
+    } else {
+      vec3 dir = normalize(r_in.direction);
+      float temp = 0.5 * (dir.y + 1.0);
+      bcolor *= vec3(1.0 - temp) + temp * vec3(0.5, 0.7, 1.0);
+      return bcolor;
+    }
+  }
+}
+/*
+vec3 ray_color(in Ray r, in Scene scene, int depth) {
+  //
+  HitRecord rec;
+  Ray r_in;
+  r_in.origin = r.origin;
+  r_in.direction = r.direction;
+  vec3 bcolor = vec3(1);
+  for (int i = depth; i >= 0; i--) {
+    if (hit_scene(scene, r_in, 0.001, INFINITY, rec)) {
+      vec3 target = rec.point + random_in_hemisphere(rec.normal);
+      r_in = makeRay(rec.point, target - rec.point);
+      bcolor *= 0.5;
+    }
+    vec3 dir = normalize(r.direction);
+    float temp = 0.5 * (dir.y + 1.0);
+    bcolor *= (1.0 - temp) * vec3(1.0) + temp * vec3(0.5, 0.7, 1.0);
+    break; // important else gpu chokes
+  }
+  return bcolor;
+}
+*/
+
+void main() {
+  // index of global work group
+  vec4 pixel = vec4(0.0, 0.0, 0.0, 1.0);
+  ivec2 pixel_index = ivec2(gl_GlobalInvocationID.xy);
+  ivec2 img_dims = imageSize(img_output); // image dimensions
+  int imwidth = img_dims.x;
+  int imheight = img_dims.y;
+  float aspect_ratio = float(imwidth) / imheight;
+  int i = pixel_index.x;
+  int j = pixel_index.y;
+  int mdepth = 45;  // 5
+  int psample = 50; // 10
+
+  // -------------- declare objects ---------------
+
+  Scene scene;
+
+  SceneObj s10, s20;
+  s10.type = 0;
+  s20.type = 0;
+  Sphere s1 = makeSphere(vec3(0, -100.5, -1), 100);
+  Sphere s2 = makeSphere(vec3(0, 0, -1), 0.5);
+  s10.sp = s1;
+  s20.sp = s2;
+  scene.ss[0] = s10;
+  scene.ss[1] = s20;
+
+  float focus_dist = 1.0;
+  Camera cam = makeCamera(aspect_ratio, focus_dist);
+
+  vec3 rcolor = vec3(0);
+
+  for (int k = 0; k < psample; k++) {
+
+    float u = float(i + random_double()) / (imwidth - 1);
+    float v = float(j + random_double()) / (imheight - 1);
+    Ray r = get_ray(cam, u, v);
+    rcolor += ray_color(r, scene, mdepth);
+  }
+
+  rcolor = fix_color(rcolor, psample);
+  // no one ends with 0 in fix color
+  //
+
+  // output specific pixel in the image
+  imageStore(img_output, pixel_index, vec4(rcolor, 1.0));
+}
+
+-}
+
+infinity = read "Infinity":: Double
+
+
+degree_to_radian :: Float -> Float
+
+degree_to_radian deg = deg * pi / 180.0
