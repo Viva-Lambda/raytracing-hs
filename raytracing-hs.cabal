@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fdb3d6be2b8e4f9f73c8e5f227ba4f4271bc3d617d1533af3033b29c2c223f50
+-- hash: 17f302de129d705f40b05e426d58a35d684f5abf4ad7c41667f1acf2e36df36c
 
 name:           raytracing-hs
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      Color
       Lib
       Primitives
       RandomFn
