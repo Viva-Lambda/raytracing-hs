@@ -4,6 +4,12 @@ module Vec3 where
 
 data Vec3 = Vec3 Double Double Double deriving (Eq, Show)
 
+makeVec :: Double -> Vec3
+makeVec t = Vec3 t t t
+
+makeVec3 :: (Double, Double, Double) -> Vec3
+makeVec3 (v1, v2, v3) = Vec3 v1 v2 v3
+
 vlookup :: Int -> Vec3 -> Double
 vlookup a (Vec3 x1 y1 z1)
     | a == 0 = x1

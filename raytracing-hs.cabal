@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 17f302de129d705f40b05e426d58a35d684f5abf4ad7c41667f1acf2e36df36c
+-- hash: 9c7bf384ea86c025849816c1a201b0b6585d1f46cac23bda888f884bce2038a3
 
 name:           raytracing-hs
 version:        0.1.0.0
@@ -31,6 +31,7 @@ library
       Lib
       Primitives
       RandomFn
+      Ray
       Vec3
   other-modules:
       Paths_raytracing_hs
